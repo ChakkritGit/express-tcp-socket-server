@@ -1,4 +1,5 @@
 import net, { Socket } from 'net'
+import os from 'os'
 
 class TcpService {
   private static instance: TcpService
@@ -28,12 +29,29 @@ class TcpService {
 
         socket.on('end', () => {
           console.log('Client disconnected')
-          this.connectedSockets = this.connectedSockets.filter(s => s !== socket)
+          this.connectedSockets = this.connectedSockets.filter(
+            s => s !== socket
+          )
         })
       })
 
+      const networkInterfaces = os.networkInterfaces()
+      let ipAddress = ''
+
+      for (const iface in networkInterfaces) {
+        const ifaceDetails = networkInterfaces[iface]
+        if (ifaceDetails) {
+          for (const details of ifaceDetails) {
+            if (details.family === 'IPv4' && !details.internal) {
+              ipAddress = details.address
+              break
+            }
+          }
+        }
+      }
+
       this.server.listen(port, () => {
-        console.log(`TCP Server running on port ${port}`)
+        console.log(`TCP Server is running on http://${ipAddress}:${port}`)
       })
     }
   }

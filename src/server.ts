@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import morgan from 'morgan'
 import routes from './routes'
+import os from 'os'
 import http, { createServer } from 'http'
 import { morganDate, socketService, tcpService } from './utils'
 import { globalErrorHanlder } from './middlewares'
@@ -38,5 +39,20 @@ server.listen(port, async () => {
     console.error('Error initializing TCP Server:', error)
   }
 
-  console.log(`Server is running on http://localhost:${port}`)
+  const networkInterfaces = os.networkInterfaces()
+  let ipAddress = ''
+
+  for (const iface in networkInterfaces) {
+    const ifaceDetails = networkInterfaces[iface]
+    if (ifaceDetails) {
+      for (const details of ifaceDetails) {
+        if (details.family === 'IPv4' && !details.internal) {
+          ipAddress = details.address
+          break
+        }
+      }
+    }
+  }
+
+  console.log(`Server is running on http://${ipAddress}:${port}`)
 })
