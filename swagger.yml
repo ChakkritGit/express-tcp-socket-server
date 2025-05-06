@@ -1,0 +1,88 @@
+openapi: 3.0.3
+info:
+  title: Swagger - ADD API
+servers:
+  - url: https://addapi.thanespgm.com/api
+tags:
+  - name: Authentication
+    description: Operations about authentication
+  - name: Users
+    description: Operations about users
+  - name: Drugs
+    description: Operations about drugs
+  - name: Orders
+    description: Operations about orders
+  - name: Inventory
+    description: Operations about inventory
+  - name: Machine
+    description: Operations about machine
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login authentication
+      description: User login to the system
+      operationId: userlogin
+      requestBody:
+        description: User login request body
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Login"
+        required: true
+      responses:
+        "200":
+          description: Login Successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Login-response"
+        "403":
+          description: Password incorrect - User is inactive
+        "404":
+          description: User not found
+components:
+  schemas:
+    Login:
+      type: object
+      properties:
+        UserName:
+          type: string
+          example: dev
+        UserPassword:
+          type: string
+          example: dev
+    Login-response:
+      type: object
+      properties:
+        token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        userId:
+          type: string
+          example: UID-d628b397-
+        userLevel:
+          type: string
+          example: ADMIN
+        userStatus:
+          type: boolean
+          example: true
+        userName:
+          type: string
+          example: ทดสอบ
+        userPic:
+          type: string
+          example: /img/users/img.jpg
+  requestBodies:
+    Login:
+      description: "User login request body"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Login"
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

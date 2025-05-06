@@ -4,17 +4,18 @@ import { Server as SocketIOServer, Socket } from 'socket.io'
 class SocketService {
   private static instance: SocketService
   private io: SocketIOServer | null = null
+  private clientConnect: Socket[] = []
 
-  private constructor () {}
+  private constructor() { }
 
-  static getInstance (): SocketService {
+  static getInstance(): SocketService {
     if (!SocketService.instance) {
       SocketService.instance = new SocketService()
     }
     return SocketService.instance
   }
 
-  initialize (server: HTTPServer): Promise<void> {
+  initialize(server: HTTPServer): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.io) {
         try {
@@ -28,6 +29,8 @@ class SocketService {
           this.io.on('connection', (socket: Socket) => {
             console.log(`User : ${socket.id} Connected!!`)
 
+            this.clientConnect.push(socket)
+
             socket.on('send_message', data => {
               console.log(`Message received:`, data)
               socket.broadcast.emit('res_message', data)
@@ -35,6 +38,10 @@ class SocketService {
 
             socket.on('disconnect', () => {
               console.log(`User : ${socket.id} Disconnected!!`)
+
+              this.clientConnect = this.clientConnect.filter(
+                s => s !== socket
+              )
             })
           })
           resolve()
@@ -48,7 +55,11 @@ class SocketService {
     })
   }
 
-  getIO (): SocketIOServer {
+  getClientConnect (): Socket[] {
+      return this.clientConnect
+    }
+
+  getIO(): SocketIOServer {
     if (!this.io) {
       throw new Error('Socket.IO has not been initialized!')
     }

@@ -13,6 +13,7 @@ dotenv.config()
 const app = express()
 const server: http.Server = createServer(app)
 const port = process.env.PORT || 3000
+const tcpPort = 2001
 
 app.use(cors({ origin: '*' }))
 app.use(express.json())
@@ -20,7 +21,6 @@ app.use(morgan(':date, :method :url :status'))
 
 morgan.token('date', morganDate)
 
-// Route
 app.use('/api', routes)
 app.use(globalErrorHanlder)
 
@@ -33,7 +33,7 @@ server.listen(port, async () => {
   }
 
   try {
-    await tcpService.initialize(2001) // ใช้พอร์ต 2001
+    await tcpService.initialize(tcpPort) 
     console.log('✅ TCP server initialized')
   } catch (error) {
     console.error('Error initializing TCP Server:', error)
