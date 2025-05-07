@@ -21,6 +21,7 @@ routes.use('/users', userRouter)
 routes.use('/drugs', drugRouter)
 routes.use('/inventory', inventoryRouter)
 // routes.use('/machine', machineRouter)
+
 // routes.use('/orders', orderRouter)
 routes.use('/device', deviceRouter)
 routes.use('/report', reportRouter)

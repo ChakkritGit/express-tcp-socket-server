@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { sendToPLC } from '../controllers/plc.Controller';
+import { sendCommand, sendCommandM } from '../controllers/plcController';
 
 const router = Router();
 
-router.post('/api/send', sendToPLC);
+router.post('/send', sendCommand);
+router.post('/send-m', sendCommandM);
 
 export default router;

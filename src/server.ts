@@ -7,6 +7,7 @@ import os from 'os'
 import http, { createServer } from 'http'
 import { morganDate, socketService, tcpService } from './utils'
 import { globalErrorHanlder } from './middlewares'
+import plcRoutes from './routes/plc.Routes'
 
 dotenv.config()
 
@@ -22,6 +23,7 @@ app.use(morgan(':date, :method :url :status'))
 morgan.token('date', morganDate)
 
 app.use('/api', routes)
+app.use('/api/plc', plcRoutes);
 app.use(globalErrorHanlder)
 
 server.listen(port, async () => {
