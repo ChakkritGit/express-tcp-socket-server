@@ -23,7 +23,6 @@ app.use(morgan(':date, :method :url :status'))
 morgan.token('date', morganDate)
 
 app.use('/api', routes)
-app.use('/api/plc', plcRoutes);
 app.use(globalErrorHanlder)
 
 server.listen(port, async () => {
