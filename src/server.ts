@@ -7,6 +7,7 @@ import os from 'os'
 import http, { createServer } from 'http'
 import { morganDate, socketService, tcpService } from './utils'
 import { globalErrorHanlder } from './middlewares'
+import plcRoutes from './routes/plc.Routes'
 
 dotenv.config()
 

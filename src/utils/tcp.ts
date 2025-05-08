@@ -6,16 +6,16 @@ class TcpService {
   private server: net.Server | null = null
   private connectedSockets: Socket[] = []
 
-  private constructor () {}
+  private constructor() { }
 
-  static getInstance (): TcpService {
+  static getInstance(): TcpService {
     if (!TcpService.instance) {
       TcpService.instance = new TcpService()
     }
     return TcpService.instance
   }
 
-  initialize (port: number) {
+  initialize(port: number) {
     if (!this.server) {
       this.server = net.createServer((socket: Socket) => {
         console.log('New TCP client connected:', socket.remoteAddress)
@@ -56,11 +56,11 @@ class TcpService {
     }
   }
 
-  getConnectedSockets (): Socket[] {
+  getConnectedSockets(): Socket[] {
     return this.connectedSockets
   }
 
-  getServer (): net.Server {
+  getServer(): net.Server {
     if (!this.server) {
       throw new Error('TCP Server has not been initialized!')
     }

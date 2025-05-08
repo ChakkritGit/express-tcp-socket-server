@@ -12,6 +12,7 @@ import inventoryRouter from './inventory.route'
 // import machineRouter from './machine.route'
 import deviceRouter from './device.route'
 import reportRouter from './report.route'
+import plcRoutes from './plc.Routes'
 
 const file = fs.readFileSync("./swagger.yml", "utf8")
 const routes = Router()
@@ -21,6 +22,7 @@ routes.use('/users', userRouter)
 routes.use('/drugs', drugRouter)
 routes.use('/inventory', inventoryRouter)
 // routes.use('/machine', machineRouter)
+routes.use('/plc', plcRoutes);
 // routes.use('/orders', orderRouter)
 routes.use('/device', deviceRouter)
 routes.use('/report', reportRouter)
