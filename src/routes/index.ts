@@ -22,7 +22,7 @@ routes.use('/users', userRouter)
 routes.use('/drugs', drugRouter)
 routes.use('/inventory', inventoryRouter)
 // routes.use('/machine', machineRouter)
-routes.use('/api/plc', plcRoutes);
+routes.use('/plc', plcRoutes);
 // routes.use('/orders', orderRouter)
 routes.use('/device', deviceRouter)
 routes.use('/report', reportRouter)
