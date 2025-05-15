@@ -8,11 +8,13 @@ export const createMachine = async (body: Machines): Promise<Machines> => {
   try {
     const UUID = `MAC-${uuidv4()}`
     const result = await prisma.machines.create({
-      select: { id: true, MachineName: true, MachineStatus: true, CreatedAt: true, UpdatedAt: true },
+      select: { id: true, MachineName: true, MachineStatus: true, IP: true, Running:true, CreatedAt: true, UpdatedAt: true },
       data: {
         id: UUID,
         MachineName: body.MachineName,
-        MachineStatus: "1"
+        MachineStatus: "1",
+        IP:body.IP,
+        Running:  1
       }
     })
     return result as Machines

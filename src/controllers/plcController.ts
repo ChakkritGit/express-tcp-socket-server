@@ -1,42 +1,159 @@
 import { Request, Response } from 'express';
 import { PlcService } from '../services/plcService';
 import { pad } from '../utils/helpers';
-import { checkMachine, sendToPLC } from '../utils/constants';
+// import { checkMachine, sendToPLC } from '../utils/constants';
 import { tcpService } from '../utils/tcp';
+import { PlcSendMessage } from '../types/inferface';
+import prisma from '../configs/prisma.config';
 
 const plcService = new PlcService();
 
+// const getRunning = async (id: string) => {
+//   let finalRunning = 1
+//   const running = await prisma.machines.findUnique({
+//     where: { id }
+//   })
+
+//   if (running.Running >= 9) {
+//     const running = await prisma.machines.update({
+//       where: { id },
+//       data: {
+//         Running: 1
+//       }
+//     })
+
+//     finalRunning = running.Running
+//   }
+
+//   finalRunning = running.Running
+
+//   return finalRunning
+// }
+const getRunning = async (id: string) => {
+  let finalRunning = 1;
+  const machine = await prisma.machines.findUnique({
+    where: { id }
+  });
+
+  if (!machine) {
+    throw new Error("Machine not found");
+  }
+
+  if (machine.Running >= 9) {
+    const updatedMachine = await prisma.machines.update({
+      where: { id },
+      data: {
+        Running: 1
+      }
+    });
+
+    finalRunning = updatedMachine.Running;
+  } else {
+    finalRunning = machine.Running;
+  }
+
+  return finalRunning;
+};
 
 export const sendCommand = async (req: Request, res: Response) => {
-  const connectedSockets = tcpService.getConnectedSockets();
-  const { floor, position, qty, container } = req.body;
-  const caseCommand = ['m38', 'm39', 'm40']
+  const { floor, position, qty, container, id } = req.body;
+  const running = await getRunning(id)
+  const body: PlcSendMessage = { floor, position, qty, container };
+
+  // console.log('📥 Incoming payload:', req.body);
 
   if (!container || !floor || !qty || !position) {
     return res.status(400).json({ error: 'Missing payload values' });
   }
 
-  if (connectedSockets.length === 0) {
-    return res.status(400).json({
-      message: 'No connected clients',
-      success: false
+  const connectedSockets = tcpService.getConnectedSockets();
+  const socket = connectedSockets[0];
+  if (!socket) {
+    return res.status(500).json({ error: 'ยังไม่มีการเชื่อมต่อกับ PLC' });
+  }
+
+  const checkCommands = ['M38', 'M39', 'M40'];
+  const successStatuses = ['34', '36', '35', '30', '31', '32', '20'];
+  const failStatuses = ['37', '33', '21', '22', '23', '24', '25', '26', '27'];
+
+  const checkMachineStatus = (cmd: string): Promise<{ status: string; raw: string }> => {
+    return new Promise((resolve, reject) => {
+      const checkMsg = `B00R00C00Q0000L00${cmd}T00N${running}D4500`;
+      console.log(`📤 Sending status check command: ${checkMsg}`);
+      socket.write(checkMsg);
+
+      const timeout = setTimeout(() => {
+        socket.off('data', onData);
+        reject(new Error('Timeout: PLC ไม่ตอบสนอง'));
+      }, 5000);
+
+      const onData = (data: Buffer) => {
+        const message = data.toString();
+        const status = message.split("T")[1]?.substring(0, 2) ?? "00";
+        clearTimeout(timeout);
+        socket.off('data', onData);
+        console.log(`📥 Response from PLC (${cmd}):`, message, '| Status T:', status);
+        resolve({ status, raw: message });
+      };
+
+      socket.on('data', onData);
     });
-  }
+  };
 
-  try {
-    for (const m of caseCommand) {
-      const isReady = await checkMachine(m, connectedSockets);
-      if (!isReady.success) {
-        return
+  for (const cmd of checkCommands) {
+    try {
+      const result = await checkMachineStatus(cmd);
+      if (failStatuses.includes(result.status)) {
+        return res.status(400).json({
+          error: `❌ เครื่องไม่พร้อมใช้งาน (${cmd})`,
+          plcResponse: result.raw,
+        });
+      } else if (!successStatuses.includes(result.status)) {
+        return res.status(400).json({
+          error: `⚠️ เครื่องตอบกลับสถานะไม่ชัดเจน (${cmd}): ${result.status}`,
+          plcResponse: result.raw,
+        });
       }
+    } catch (err) {
+      console.error(`❌ Error during status check for ${cmd}:`, err);
+      return res.status(500).json({ error: `เกิดข้อผิดพลาดระหว่างเช็ค ${cmd}`, detail: err });
     }
-
-    const result = await sendToPLC(floor, position, qty, container)
-    return res.status(200).json(result)
-  } catch (error) {
-    return res.status(400).json(error)
   }
+
+
+  const sumValue = container + floor + position + qty + 1 + 0 + 0 + running + 4500;
+  const sum = pad(sumValue, 2).slice(-2);
+  const message = `B${pad(container, 2)}R${pad(floor, 2)}C${pad(position, 2)}Q${pad(qty, 4)}L01M00T00N${running}D4500S${sum}`;
+
+  console.log('📤 Final command to send:', message);
+  socket.write(message);
+
+  let responded = false;
+  const timeout = setTimeout(() => {
+    if (!responded) {
+      console.warn('⌛ Timeout waiting for response from PLC');
+      return res.status(504).json({ error: 'PLC ไม่ตอบสนองในเวลา 5 วินาที' });
+    }
+  }, 5000);
+
+  socket.once('data', (data) => {
+    responded = true;
+    clearTimeout(timeout);
+    console.log('📥 Final PLC response:', data.toString());
+    res.json({
+      message: 'จัดยาเสร็จ',
+      floor: body.floor,
+      position: body.position,
+      plcResponse: data.toString()
+    });
+  });
 };
+
+
+
+
+
+
 
 export const sendCommandM = (req: Request, res: Response) => {
   const { command, floor, position, qty } = req.body;
@@ -46,7 +163,7 @@ export const sendCommandM = (req: Request, res: Response) => {
   const running = plcService.getRunning();
   let sumValue = 0 + 0 + 0 + 0 + 0 + 0 + parseInt(command.slice(1)) + running + 4500;
   let message = `B00R00C00Q0000L00${command.toUpperCase()}T00N${running}D4500`;
-
+  console.log('📤 Sending to PLC:', message);
   if (command === "m32") {
     if (floor === undefined || position === undefined || qty === undefined) {
       return res.status(400).json({ error: 'Missing params for m32' });
