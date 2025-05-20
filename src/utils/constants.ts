@@ -107,10 +107,6 @@ function getStatusT(status: string, qty?: string): { status: string, message: st
       status: '30',
       message: 'ประตูทั่งสองฝั่งล็อก'
     };
-    case '2x': return {
-      status: '2x',
-      message: 'ชั􀃊นเก็บยาที􀃉 x{1-7} ปิดไม่สนิทและ x เท่ากับ 0 เมื􀃉อปิดสนิททั􀃊งหมด'
-    };
     case '31': return {
       status: '31',
       message: 'ประตูฝั่งซ้ายล็อกเพียงบานเดียว'
@@ -150,47 +146,63 @@ function getStatusT(status: string, qty?: string): { status: string, message: st
   }
 }
 
-const checkMachine = (command: string, connectedSockets: Socket[]): Promise<{ message: string, success: boolean }> => {
+const checkMachine = (command: string, connectedSockets: Socket[], container = 0, floor = 0, position = 0, qty = 0): Promise<{ message: string, success: boolean }> => {
   return new Promise((resolve, reject) => {
     const plcService = new PlcService();
     const running = plcService.getRunning();
-    const message = `B00R00C00Q0000L00${command.toUpperCase()}T00N${running}D4500`;
+    const socket = connectedSockets[0];
 
-    try {
-      const socket = connectedSockets[0];
-      socket.write(message);
-      socket.once('data', (data) => {
-        console.log(`Message: ${data.toString()}`)
-        const status = data.toString().split("T", 2)[1]?.substring(0, 2) || "00";
-        const lastChecking = getStatusT(status);
+    if (!socket) {
+      return resolve({
+        message: 'ไม่พบการเชื่อมต่อกับเครื่อง',
+        success: false
+      });
+    }
 
+    const checkMessage = `B00R00C00Q0000L00${command.toUpperCase()}T00N${running}D4500`;
+
+    let stage = 0;
+    let timeout = setTimeout(() => {
+      socket.off('data', onData);
+      resolve({ message: 'Timeout', success: false });
+    }, 5000);
+
+    const onData = (data: Buffer) => {
+      const message = data.toString();
+      const status = message.split("T", 2)[1]?.substring(0, 2) || "00";
+
+      if (stage === 0) {
+        const m = getStatusT(status, qty.toString());
+        const channelM = m.status === '35' ? 'M02' : 'M01';
+        const sumValue = container + floor + position + qty + 1 + (channelM === 'M02' ? 2 : 1) + 0 + running + 4500;
+        const sum = pad(sumValue, 2).slice(-2);
+        const messageToSend = `B${pad(container, 2)}R${pad(floor, 2)}C${pad(position, 2)}Q${pad(qty, 4)}L01${channelM}T00N${running}D4500S${sum}`;
+        
+        stage = 1;
+        socket.write(messageToSend);
+      } else if (stage === 1) {
+        clearTimeout(timeout);
+        socket.off('data', onData);
+
+        const lastChecking = getStatusT(status, qty.toString());
         const successStatuses = ['34', '36', '35', '30', '31', '32', '20'];
         const failStatuses = ['37', '33', '21', '22', '23', '24', '25', '26', '27'];
 
         if (successStatuses.includes(lastChecking.status)) {
-          resolve({
-            message: lastChecking.message,
-            success: true
-          });
+          resolve({ message: lastChecking.message, success: true });
         } else if (failStatuses.includes(lastChecking.status)) {
-          resolve({
-            message: lastChecking.message,
-            success: false
-          });
+          resolve({ message: lastChecking.message, success: false });
         } else {
-          resolve({
-            message: 'Unknown status',
-            success: false
-          });
+          resolve({ message: 'Unknown status: ' + status, success: false });
         }
-      });
+      }
+    };
 
-      socket.once('error', (err) => {
-        reject({
-          message: 'Socket error: ' + err.message,
-          success: false
-        });
-      });
+    socket.on('data', onData);
+    socket.write(checkMessage);
+  });
+};
+
 
       // Optional: timeout
       // setTimeout(() => {
@@ -200,6 +212,68 @@ const checkMachine = (command: string, connectedSockets: Socket[]): Promise<{ me
       //   });
       // }, 5000); // 5 seconds timeout
 
+
+const sendToPLC = (floor: number, position: number, qty: number, container: number): Promise<{ message: string, success: boolean }> => {
+  return new Promise((resolve, reject) => {
+    const plcService = new PlcService();
+    const running = plcService.getRunning();
+    const connectedSockets = tcpService.getConnectedSockets();
+
+    try {
+      const socket = connectedSockets[0];
+
+      // Step 1: ตรวจสอบสถานะเพื่อกำหนด M01 หรือ M02
+      const checkMessage = `B00R00C00Q0000L00M39T00N${running}D4500`;
+      socket.write(checkMessage);
+
+      socket.once('data', (message) => {
+        const status = message.toString().split("T", 2)[1]?.substring(0, 2) || "00";
+        const m = getStatusT(status);
+        const channelM = m.status === '35' ? 'M02' : 'M01';
+
+        // Step 2: คำนวณค่า sum
+        const sumValue = container + floor + position + qty + 1 + (channelM === 'M02' ? 2 : 1) + 0 + running + 4500;
+        const sum = pad(sumValue, 2).slice(-2);
+
+        // Step 3: สร้าง message จริงสำหรับจ่ายยา
+        const messageToSend = `B${pad(container, 2)}R${pad(floor, 2)}C${pad(position, 2)}Q${pad(qty, 4)}L01${channelM}T00N${running}D4500S${sum}`;
+        socket.write(messageToSend);
+
+        socket.once('data', (data) => {
+          console.log(`PLC Response: ${data.toString()}`);
+          const status = data.toString().split("T", 2)[1]?.substring(0, 2) || "00";
+          const lastChecking = getStatusT(status);
+
+          const successStatuses = ['34', '36', '35', '30', '31', '32', '20'];
+          const failStatuses = ['37', '33', '21', '22', '23', '24', '25', '26', '27'];
+
+          if (successStatuses.includes(lastChecking.status)) {
+            resolve({
+              message: lastChecking.message,
+              success: true
+            });
+          } else if (failStatuses.includes(lastChecking.status)) {
+            resolve({
+              message: lastChecking.message,
+              success: false
+            });
+          } else {
+            resolve({
+              message: 'Unknown status',
+              success: false
+            });
+          }
+        });
+
+        socket.once('error', (err) => {
+          console.error(`Socket error: ${err.message}`);
+          reject({
+            message: 'Socket error: ' + err.message,
+            success: false
+          });
+        });
+      });
+
     } catch (error) {
       return resolve({
         message: `Error: ${error}`,
@@ -208,61 +282,6 @@ const checkMachine = (command: string, connectedSockets: Socket[]): Promise<{ me
     }
   });
 };
-
-const sendToPLC = (floor: number, position: number, qty: number, container: number): Promise<{ message: string, success: boolean }> => {
-  return new Promise((resolve, reject) => {
-    const plcService = new PlcService();
-    const running = plcService.getRunning();
-    const connectedSockets = tcpService.getConnectedSockets();
-    let channelM = ''
-
-    try {
-      const socket = connectedSockets[0];
-      const channel = `B00R00C00Q0000L00M39T00N${running}D4500`;
-      socket.write(channel);
-
-      socket.once('data', (message) => {
-        const status = message.toString().split("T", 2)[1]?.substring(0, 2) || "00";
-        const m = getStatusT(status)
-        if (m.status === '35') {
-          channelM = 'M02'
-        }
-        else {
-          channelM = 'M01'
-        }
-      })
-
-
-      const sumValue = container + floor + position + qty + 1 + channelM === 'M02' ? 2 : 1 + 0 + running + 4500;
-      const sum = pad(sumValue, 2).slice(-2);
-      const message = `B${pad(container, 2)}R${pad(floor, 2)}C${pad(position, 2)}Q${pad(qty, 4)}L01${channelM}T00N${running}D4500S${sum}`;
-      
-      socket.write(message);
-      socket.once('data', (stream) => {
-        const status = stream.toString().split("T", 2)[1]?.substring(0, 2) || "00";
-        const qty = stream.toString().split("Q", 2)[1];
-        const success = getStatusT(status, qty)
-        if (success.status === '92') {
-          resolve({
-            message: success.message,
-            success: true
-          }
-          )
-        }
-        else {
-          reject({
-            message: success.message,
-            success: false
-          }
-          )
-        }
-      })
-    } catch (error) {
-      reject(error)
-    }
-  })
-
-}
 
 
 

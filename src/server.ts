@@ -14,7 +14,7 @@ dotenv.config()
 const app = express()
 const server: http.Server = createServer(app)
 const port = process.env.PORT || 3000
-const tcpPort = 2001
+const tcpPort = 2004
 
 app.use(cors({ origin: '*' }))
 app.use(express.json())
