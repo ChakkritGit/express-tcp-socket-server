@@ -34,7 +34,7 @@ server.listen(port, async () => {
   }
 
   try {
-    await tcpService.initialize(tcpPort) 
+    await tcpService.initialize(tcpPort)
     console.log('✅ TCP server initialized')
   } catch (error) {
     console.error('Error initializing TCP Server:', error)
