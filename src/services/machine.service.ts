@@ -8,13 +8,12 @@ export const createMachine = async (body: Machines): Promise<Machines> => {
   try {
     const UUID = `MAC-${uuidv4()}`
     const result = await prisma.machines.create({
-      select: { id: true, MachineName: true, MachineStatus: true, IP: true, Running:true, CreatedAt: true, UpdatedAt: true },
+      select: { id: true, MachineName: true, MachineStatus: true, IP: true,  CreatedAt: true, UpdatedAt: true },
       data: {
         id: UUID,
         MachineName: body.MachineName,
         MachineStatus: "1",
-        IP:body.IP,
-        Running:  1
+        IP:body.IP
       }
     })
     return result as Machines
@@ -31,7 +30,7 @@ export const createMachine = async (body: Machines): Promise<Machines> => {
 export const machineList = async (): Promise<Machines[]> => {
   try {
     const result = await prisma.machines.findMany({
-      select: { id: true, MachineName: true, MachineStatus: true, CreatedAt: true, UpdatedAt: true },
+      select: { id: true, MachineName: true, MachineStatus: true, CreatedAt: true, UpdatedAt: true,IP:true },
       orderBy: {
         CreatedAt: 'desc'
       }
@@ -45,7 +44,7 @@ export const machineList = async (): Promise<Machines[]> => {
 export const searchMachine = async (id: string): Promise<Machines | null> => {
   try {
     const result = await prisma.machines.findFirst({
-      select: { id: true, MachineName: true, MachineStatus: true, CreatedAt: true, UpdatedAt: true },
+      select: { id: true, MachineName: true, MachineStatus: true, CreatedAt: true, UpdatedAt: true , IP:true },
       where: { id }
     })
     if (!result) throw new HttpError(404, "Machine not found")
@@ -59,7 +58,7 @@ export const updateMachine = async (id: string, body: Machines): Promise<Machine
   try {
     const result = await prisma.machines.update({
       data: { MachineName: body.MachineName, MachineStatus: body.MachineStatus },
-      select: { id: true, MachineName: true, MachineStatus: true, CreatedAt: true, UpdatedAt: true },
+      select: { id: true, MachineName: true, MachineStatus: true, CreatedAt: true, UpdatedAt: true , IP:true },
       where: { id }
     })
     return result as Machines

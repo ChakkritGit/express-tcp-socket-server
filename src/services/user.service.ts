@@ -43,7 +43,7 @@ export const findUsers = async (userId: string): Promise<Users> => {
         UserRole: true,
         UserStatus: true,
         CreateBy: true,
-        PrescriptionUsed: true,
+       
         CreatedAt: true,
         UpdatedAt: true
       }

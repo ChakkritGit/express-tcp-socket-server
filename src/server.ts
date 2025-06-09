@@ -8,6 +8,8 @@ import http, { createServer } from 'http'
 import { morganDate, socketService, tcpService } from './utils'
 import { globalErrorHanlder } from './middlewares'
 import plcRoutes from './routes/plc.Routes'
+import RabbitMQService from './services/RabbitMQService'
+import { initRabbitMq } from './services'
 
 dotenv.config()
 
@@ -15,6 +17,7 @@ const app = express()
 const server: http.Server = createServer(app)
 const port = process.env.PORT || 3000
 const tcpPort = 2004
+const rabbitService = RabbitMQService.getInstance();
 
 app.use(cors({ origin: '*' }))
 app.use(express.json())
@@ -34,10 +37,25 @@ server.listen(port, async () => {
   }
 
   try {
-    await tcpService.initialize(tcpPort) 
+    await tcpService.initialize(tcpPort)
     console.log('✅ TCP server initialized')
   } catch (error) {
     console.error('Error initializing TCP Server:', error)
+  }
+
+    try {
+    await initRabbitMq()
+    console.log('✅ RabbitMQ initialized')
+  } catch (error) {
+    console.error('Error rabbitMQ initialize: ', error)
+  }
+
+
+  try {
+    rabbitService.listenToQueue('orders')
+    console.log('✅ RabbitMQ Listening queue: orders')
+  } catch (error) {
+    console.error('Error rabbitMQ listen queue: ', error)
   }
 
   const networkInterfaces = os.networkInterfaces()

@@ -20,7 +20,8 @@ export const Createinventory = async (body: Inventory): Promise<Inventory> => {
         Max: body.Max,           
         DrugId: body.DrugId,
         // MachineId: body.MachineId,
-        InventoryStatus: true
+        InventoryStatus: true,
+        InventoryFloor :body.InventoryFloor
       }
     })
     return result
@@ -89,7 +90,8 @@ export const inventoryModify = async (id: string, body: Inventory): Promise<Inve
         Max: body.Max,
         DrugId: body.DrugId,
         // MachineId: body.MachineId,
-        InventoryStatus: true
+        InventoryStatus: true,
+        InventoryFloor :body.InventoryFloor
       },
       where: { id: id }
     })

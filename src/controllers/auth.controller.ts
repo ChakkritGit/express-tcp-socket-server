@@ -18,7 +18,7 @@ export const createUser = async (req: Request, res: Response<BaseResponse<Users>
   } catch (error) {
     next(error)
   }
-}
+} 
 
 export const generateQR = async (req: Request, res: Response<BaseResponse<GenQr>>, next: NextFunction) => {
   try {

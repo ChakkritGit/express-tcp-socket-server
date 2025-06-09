@@ -1,8 +1,7 @@
 import { NextFunction, Request, Response } from "express"
+import { BaseResponse } from "../model/responseModel"
 import { Drugs } from "@prisma/client"
-import { BaseResponse } from "../model"
-import { addDrug, deleteDrugService, editDrugService, findDrug, findDrugId } from "../services/drug.service"
-
+import { addDrug, deleteDrugService, editDrugService, findDrug, findDrugId } from "../services"
 
 export const createDrug = async (req: Request, res: Response<BaseResponse<Drugs>>, next: NextFunction) => {
   try {

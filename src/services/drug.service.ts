@@ -6,13 +6,16 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library"
 import { HttpError } from "../error"
 import { getDrugImage } from "../utils/image"
 import { getDateFormat } from "../utils/date-format"
+import { v4 as uuidv4 } from 'uuid'
+
 
 export const addDrug = async (body: Drugs, pic?: Express.Multer.File): Promise<Drugs | undefined> => {
+   const UUID = `drg-${uuidv4()}`
   try {
     const result = await prisma.drugs.create({
       data: {
-        id: body.id,
-        Drugcode: body.Drugcode,
+        id: UUID,
+        Drugcode: body.id,
         DrugName: body.DrugName,
        
         DrugStatus: true,
@@ -64,12 +67,12 @@ export const findDrugId = async (drugId: string): Promise<Drugs | null> => {
 export const editDrugService = async (body: Drugs, drugId: string, pic?: Express.Multer.File): Promise<Drugs> => {
   try {
     const filename = await getDrugImage(drugId)
-    if (body.DrugStatus) body.DrugStatus = String(body.DrugStatus) == "1" ? true : false
+    // if (body.DrugStatus) body.DrugStatus = String(body.DrugStatus) == "1" ? true : false
     body.DrugImage = !pic ? filename || null : `/img/drugs/${pic.filename}`
     body.UpdatedAt = getDateFormat(new Date())
     const result = await prisma.drugs.update({
       where: {
-        id: drugId
+        Drugcode: drugId
       },
       data: body
     })
@@ -92,7 +95,7 @@ export const deleteDrugService = async (drugId: string): Promise<Drugs> => {
     const filename = await getDrugImage(drugId)
     const result = await prisma.drugs.delete({
       where: {
-        id: drugId
+        Drugcode: drugId
       }
     })
     if (!!filename) fs.unlinkSync(path.join('public/images/drugs', filename.split("/")[3]))

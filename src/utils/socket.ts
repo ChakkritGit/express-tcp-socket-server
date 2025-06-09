@@ -6,7 +6,7 @@ class SocketService {
   private io: SocketIOServer | null = null
   private clientConnect: Socket[] = []
 
-  private constructor() { }
+  private constructor() {}
 
   static getInstance(): SocketService {
     if (!SocketService.instance) {

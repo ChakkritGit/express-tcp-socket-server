@@ -11,7 +11,7 @@ CREATE TABLE "Drugs" (
     "CreatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "UpdatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "Drugs_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Drugs_pkey" PRIMARY KEY ("Drugcode")
 );
 
 -- CreateTable
@@ -25,6 +25,8 @@ CREATE TABLE "Orders" (
     "Machine" VARCHAR(200) NOT NULL,
     "Command" VARCHAR(200) NOT NULL,
     "OrderStatus" CHAR(1) NOT NULL DEFAULT '0',
+    "Position" INTEGER NOT NULL,
+    "Channel" INTEGER NOT NULL,
     "Slot" VARCHAR(2),
     "CreatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "UpdatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -44,7 +46,6 @@ CREATE TABLE "Prescription" (
     "PriorityCode" VARCHAR(20) NOT NULL,
     "PriorityDesc" VARCHAR(200) NOT NULL,
     "PresStatus" CHAR(1) NOT NULL DEFAULT '0',
-    "UsedByUserId" TEXT NOT NULL,
     "CreatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "UpdatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -60,6 +61,8 @@ CREATE TABLE "Machines" (
     "MachineSlot2" BOOLEAN NOT NULL DEFAULT false,
     "CreatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "UpdatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "IP" VARCHAR(100),
+    "Running" INTEGER NOT NULL DEFAULT 1,
 
     CONSTRAINT "Machines_pkey" PRIMARY KEY ("id")
 );
@@ -75,6 +78,8 @@ CREATE TABLE "Inventory" (
     "DrugId" VARCHAR(100) NOT NULL,
     "CreatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "UpdatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "Expiydate" TIMESTAMP(3),
+    "InventoryFloor" INTEGER NOT NULL,
 
     CONSTRAINT "Inventory_pkey" PRIMARY KEY ("id")
 );
@@ -103,13 +108,10 @@ CREATE UNIQUE INDEX "Inventory_DrugId_key" ON "Inventory"("DrugId");
 CREATE UNIQUE INDEX "Users_UserName_key" ON "Users"("UserName");
 
 -- AddForeignKey
-ALTER TABLE "Orders" ADD CONSTRAINT "Orders_OrderItemId_fkey" FOREIGN KEY ("OrderItemId") REFERENCES "Drugs"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Orders" ADD CONSTRAINT "Orders_OrderItemId_fkey" FOREIGN KEY ("OrderItemId") REFERENCES "Drugs"("Drugcode") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Orders" ADD CONSTRAINT "Orders_PrescriptionId_fkey" FOREIGN KEY ("PrescriptionId") REFERENCES "Prescription"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Prescription" ADD CONSTRAINT "Prescription_UsedByUserId_fkey" FOREIGN KEY ("UsedByUserId") REFERENCES "Users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Inventory" ADD CONSTRAINT "Inventory_DrugId_fkey" FOREIGN KEY ("DrugId") REFERENCES "Drugs"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Inventory" ADD CONSTRAINT "Inventory_DrugId_fkey" FOREIGN KEY ("DrugId") REFERENCES "Drugs"("Drugcode") ON DELETE RESTRICT ON UPDATE CASCADE;
