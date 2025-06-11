@@ -3,19 +3,24 @@ import prisma from "../configs/prisma.config"
 import { jwtDecodeType, OrderType, Prescription, PrescriptionList } from "../types"
 import { HttpError } from "../error"
 import { Orders } from "@prisma/client"
-import { getDateFormat } from "../utils"
+import { getDateFormat, socketService, tcpService } from "../utils"
 import { statusPrescription } from "./prescription.service"
 import { io } from "../configs"
 import { jwtDecode } from "jwt-decode"
 import RabbitMQService from "./RabbitMQService"
+import { PlcService } from "./plcService"
+import { pad } from "../utils/helpers"
 
 const validStatusTransitions = {
+  ready: 'pending',
   pending: 'ready',
   receive: 'pending',
   complete: 'receive',
   error: 'pending',
-  ready: 'pending',
 }
+
+const plcService = new PlcService();
+const rabbitService = RabbitMQService.getInstance();
 
 type OrderStatus = keyof typeof validStatusTransitions
 
@@ -155,35 +160,174 @@ export const getOrderService = async (): Promise<Orders[]> => {
     throw error
   }
 }
+// export const received = async (drugId: string): Promise<Orders> => {
+//   try {
+//     const notready = await prisma.orders.findMany({
+//       where: { OrderStatus: { equals: 'receive' } }
+//     });
+
+//     if (notready.length >= 2) {
+//       throw new Error(`ไม่สามารถรับยาได้กรุณานำยาออกจากช่องก่อน!`);
+//     }
+//     const result = await prisma.orders.findFirst({
+//       where: {
+//         OrderItemId: drugId,
+//       },
+//     });
+
+//     if (!result) {
+//       throw new Error(`Order with ID ${drugId} not found`);
+//     }
+
+//     const connectedSockets = tcpService.getConnectedSockets();
+//     const socket = connectedSockets[0];
+
+//     const checkMachineStatus = (cmd: string): Promise<{ status: string; raw: string }> => {
+//       return new Promise((resolve) => {
+//         const running = plcService.getRunning();
+//         const m = parseInt(cmd.slice(1));
+//         const sumValue = 0 + 0 + 0 + 0 + 0 + m + 0 + running + 4500;
+//         const sum = pad(sumValue, 2).slice(-2);
+//         const checkMsg = `B00R00C00Q0000L00${cmd}T00N${running}D4500S${sum}`;
+
+//         console.log(`📤 Sending status check command: ${checkMsg}`);
+//         socket.write(checkMsg);
+
+//         const onData = (data: Buffer) => {
+//           const message = data.toString();
+//           const status = message.split("T")[1]?.substring(0, 2) ?? "00";
+//           socket.off('data', onData);
+//           console.log(`📥 Response from PLC (${cmd}):`, message, '| Status T:', status);
+//           resolve({ status, raw: message });
+//         };
+
+//         socket.on('data', onData);
+//       });
+//     };
+
+//     // ฟังก์ชันส่งคำสั่งปลดล็อกประตูตามสถานะที่ได้รับ
+//     const unlockDoorByStatus = async (status: string) => {
+//       if (status === "30") {
+//         throw new Error("❌ ประตูทั้งสองฝั่งล็อกอยู่ ยังไม่สามารถเปิดได้");
+//       } else if (status === "31") {
+//         // ฝั่งซ้ายล็อก ต้องส่งคำสั่งปลดล็อกขวา (M34)
+//         await plcService.sendCommand("M34");
+//         console.log("✅ ปลดล็อกและเปิดไฟช่องจ่ายยาขวา ");
+//       } else if (status === "32") {
+//         // ฝั่งขวาล็อก ต้องส่งคำสั่งปลดล็อกซ้าย (M35)
+//         await plcService.sendCommand("M35");
+//         console.log("✅ ปลดล็อกและเปิดไฟช่องจ่ายยาซ้าย ");
+//       } else {
+//         throw new Error(`❌ สถานะผิดพลาดหรือไม่รู้จัก: ${status}`);
+//       }
+//     };
+
+//     if (result.OrderStatus === "receive" || result.OrderStatus === "error") {
+    
+//       await updateOrder(result.id, "complete");
+
+     
+//       if (socket) {
+//         const machineStatus = await checkMachineStatus("M38");
+//         await unlockDoorByStatus(machineStatus.status);
+//       }
+
+//       const value = await findOrders(["complete", "error"]);
+//       if (value.length === 0) await statusPrescription(result.PrescriptionId, "complete");
+
+//       rabbitService.acknowledgeMessage();
+//       socketService.getIO().emit("res_message", `Receive Order : ${result.id}`);
+//     } else {
+//       throw new Error("This item is not in a ready to receive drug");
+//     }
+
+//     return result;
+//   } catch (error) {
+//     throw error;
+//   }
+// };
 
 export const received = async (drugId: string): Promise<Orders> => {
-  const rabbitService = RabbitMQService.getInstance();
   try {
+    
+    const notready = await prisma.orders.findMany({
+      where: { OrderStatus: { equals: 'receive' } }
+    })
+
+    if (notready.length >= 2) {
+      throw new Error(`ไม่สามารถรับยาได้กรุณานำยาออกจากช่องก่อน!`);
+    }
+
     const result = await prisma.orders.findFirst({
       where: {
-        // PrescriptionId: presId,
-        OrderItemId: drugId
+        OrderItemId: drugId,
       },
-      // include: { DrugInfo: { include: { Inventory: { include: { Machines: true } } } } }
-    })
-    if (result?.OrderStatus === "complete" || result?.OrderStatus === "error") {
-      await updateOrder(result.id, "complete")
-      // await updateOrderDevice(result.DrugInfo.Inventory?.Machines.id, result.Slot, result.id, Number(result.DrugInfo.Inventory?.InventoryQty) - result.OrderQty, String(result.DrugInfo.Inventory?.id), false)
-      const value = await findOrders(['pending', 'receive', 'complete', 'error', 'ready'])
-      if (value.length === 0) await statusPrescription(result.PrescriptionId, "complete")
-      rabbitService.acknowledgeMessage()
-      io.sockets.emit("res_message", `Receive Order : ${result.id}`)
-    } else {
-      throw "This item is not in a ready to receive drug"
+    });
+
+    if (!result) {
+      throw new Error(`Order with ID ${drugId} not found`);
     }
-    return result
+
+    if (result.OrderStatus === "receive" || result.OrderStatus === "error") {
+      await updateOrder(result.id, "complete");
+      const value = await findOrders(["complete", "error"]);
+      if (value.length === 0) await statusPrescription(result.PrescriptionId, "complete");
+
+      rabbitService.acknowledgeMessage();
+      socketService.getIO().emit("res_message", `Receive Order : ${result.id}`);
+    } else {
+      throw new Error("This item is not in a ready to receive drug");
+    }
+
+    return result;
   } catch (error) {
-    throw (error)
+    throw error;
   }
-}
+};
+
 
 export const updateStatusOrderServicePending = async (id: string, status: OrderStatus, presId: string) => {
   try {
+    const connectedSockets = tcpService.getConnectedSockets();
+    const socket = connectedSockets[0];
+
+    if (socket && status === 'receive') {
+      const checkMachineStatus = (cmd: string): Promise<{ status: string; raw: string }> => {
+        return new Promise((resolve) => {
+          const running = plcService.getRunning();
+          const m = parseInt(cmd.slice(1));
+          const sumValue = 0 + 0 + 0 + 0 + 0 + m + 0 + running + 4500;
+          const sum = pad(sumValue, 2).slice(-2);
+          const checkMsg = `B00R00C00Q0000L00${cmd}T00N${running}D4500S${sum}`;
+
+          console.log(`📤 Sending status check command: ${checkMsg}`);
+          socket.write(checkMsg);
+
+          // const timeout = setTimeout(() => {
+          //   socket.off('data', onData);
+          //   reject(new Error('Timeout: PLC ไม่ตอบสนอง'));
+          // }, 5000);
+
+          const onData = (data: Buffer) => {
+            const message = data.toString();
+            const status = message.split("T")[1]?.substring(0, 2) ?? "00";
+            // clearTimeout(timeout);
+            socket.off('data', onData);
+            console.log(`📥 Response from PLC (${cmd}):`, message, '| Status T:', status);
+            resolve({ status, raw: message });
+          };
+
+          socket.on('data', onData);
+        });
+      };
+
+      const status = await checkMachineStatus("M39")
+
+      if (status.status !== '37') {
+        rabbitService.acknowledgeMessage();
+      }
+    }
+
     const order = await prisma.orders.findUnique({ where: { id: id, PrescriptionId: presId } })
 
     if (!order) throw new HttpError(404, 'ไม่พบรายการ!')

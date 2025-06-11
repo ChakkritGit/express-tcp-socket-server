@@ -6,13 +6,27 @@ import { getPharmacyPres } from "../interface"
 import { Orders } from "@prisma/client"
 import { io } from "../configs"
 import { PlcSendMessage } from "../types/inferface"
-import { socketService } from "../utils"
+import { socketService, tcpService } from "../utils"
+import prisma from "../configs/prisma.config"
 
 export const dispenseOrder = async (req: Request, res: Response<BaseResponse<Orders[]>>, next: NextFunction) => {
   try {
     const { id } = req.body
     const rfid = req.params.rfid
-    // const token = req.headers['authorization']
+    const connectedSockets = tcpService.getConnectedSockets();
+
+    const findMachine = await prisma.machines.findUnique({
+      where: { id }
+    })
+
+    if (findMachine && connectedSockets.length > 0) {
+      connectedSockets.filter((item) => {
+        if (item.remoteAddress !== findMachine.IP) {
+          throw new HttpError(500, 'เครื่องไม่พร้อมใช้งาน')
+        }
+      })
+    }
+
     const order = await findPrescription()
     if (!!order) {
       throw new HttpError(409, 'Order already exists')
@@ -63,6 +77,24 @@ export const receiveOrder = async (req: Request, res: Response<BaseResponse<Orde
     next(error)
   }
 }
+// // Controller รับคำสั่งจากฝั่ง frontend
+// export const receiveOrder = async (req: Request, res: Response<BaseResponse<Orders>>, next: NextFunction) => {
+//   try {
+//     const { sticker } = req.params;
+
+//     const data = await received(sticker);
+
+//     res.status(200).json({
+//       message: 'Success',
+//       success: true,
+//       data
+//     });
+//   } catch (error) {
+//     console.error("Error in receiveOrder:", error);
+//     next(error); // ส่ง error ให้ Express middleware จัดการ
+//   }
+// };
+
 
 export const updateStatusPending = async (req: Request, res: Response<BaseResponse<Orders>>, next: NextFunction) => {
   try {

@@ -49,7 +49,6 @@ model Prescription {
   PriorityCode     String @db.VarChar(20)
   PriorityDesc     String @db.VarChar(200)
   PresStatus       String @default("ready") @db.VarChar(100)
-
   CreatedAt DateTime @default(now())
   UpdatedAt DateTime @default(now()) @updatedAt
   Order     Orders[]
