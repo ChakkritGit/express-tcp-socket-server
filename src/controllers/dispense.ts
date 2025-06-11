@@ -1,13 +1,13 @@
 import type { Request, Response } from 'express'
-import { socketService, tcpService } from "../utils"
+import { socketService, tcpService } from '../utils'
 
 const dispense = (req: Request, res: Response) => {
   const body = req.body
   const message = body.message || 'Hello, TCP Client!'
   const connectedSockets = tcpService.getConnectedSockets()
-  const client = socketService.getClientConnect() 
+  const client = socketService.getClientConnect()
 
-  const clientConeected = client.find((f) => f.id === '123')
+  const clientConeected = client.find(f => f.id === '123')
 
   const command = 'Z21'
 
@@ -19,11 +19,13 @@ const dispense = (req: Request, res: Response) => {
       })
     }
 
-    const socket = connectedSockets.find((f) => f.remoteAddress === 'from front-end')
+    const socket = connectedSockets.find(
+      f => f.remoteAddress === 'from front-end'
+    )
     if (socket && clientConeected) {
       socket.write(message)
 
-      socket.on('data', (data) => {
+      socket.on('data', data => {
         // if (getStatus() === '91') {
         //   clientConeected.emit('device1', new Date())
         // } else if (getStatus() === '92') {

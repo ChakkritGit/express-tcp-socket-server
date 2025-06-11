@@ -16,7 +16,7 @@ import plcRoutes from './plc.Routes'
 import machineRouter from './machine.route'
 import orderRouter from './order.route'
 
-const file = fs.readFileSync("./swagger.yml", "utf8")
+const file = fs.readFileSync('./swagger.yml', 'utf8')
 const routes = Router()
 
 routes.use('/auth', authRouter)
@@ -24,17 +24,24 @@ routes.use('/users', userRouter)
 routes.use('/drugs', drugRouter)
 routes.use('/inventory', inventoryRouter)
 routes.use('/machine', machineRouter)
-routes.use('/plc', plcRoutes);
+routes.use('/plc', plcRoutes)
 routes.use('/orders', orderRouter)
 routes.use('/device', deviceRouter)
 routes.use('/report', reportRouter)
 routes.use('/font', fontRouter)
 routes.use('/swagger', swaggerUi.serve, swaggerUi.setup(YAML.parse(file)))
-routes.use('/img', express.static(process.env.NODE_ENV === 'development' ? 'src/public/images' : 'public/images'))
+routes.use(
+  '/img',
+  express.static(
+    process.env.NODE_ENV === 'development'
+      ? 'src/public/images'
+      : 'public/images'
+  )
+)
 routes.use('/fonts', express.static('public/fonts'))
 routes.use('/', (req: Request, res: Response<BaseResponse>) => {
   res.status(404).json({
-    message: 'Not Found',  
+    message: 'Not Found',
     success: false,
     data: null
   })

@@ -1,26 +1,44 @@
-import { NextFunction, Request, Response } from "express"
-import { BaseResponse } from "../model"
-import { cancelQueue, clearAllOrder, createPresService, deletePrescription, findOrders, findPrescription, getOrderService, received, sendOrder, statusPrescription, updateOrder, updatePrescription, updateStatusOrderServicePending } from "../services"
-import { HttpError } from "../error"
-import { getPharmacyPres } from "../interface"
-import { Orders } from "@prisma/client"
-import { io } from "../configs"
-import { PlcSendMessage } from "../types/inferface"
-import { socketService, tcpService } from "../utils"
-import prisma from "../configs/prisma.config"
+import { NextFunction, Request, Response } from 'express'
+import { BaseResponse } from '../model'
+import {
+  cancelQueue,
+  clearAllOrder,
+  createPresService,
+  deletePrescription,
+  findOrders,
+  findPrescription,
+  getOrderService,
+  received,
+  sendOrder,
+  statusPrescription,
+  updateOrder,
+  updatePrescription,
+  updateStatusOrderServicePending
+} from '../services'
+import { HttpError } from '../error'
+import { getPharmacyPres } from '../interface'
+import { Orders } from '@prisma/client'
+import { io } from '../configs'
+import { PlcSendMessage } from '../types/inferface'
+import { socketService, tcpService } from '../utils'
+import prisma from '../configs/prisma.config'
 
-export const dispenseOrder = async (req: Request, res: Response<BaseResponse<Orders[]>>, next: NextFunction) => {
+export const dispenseOrder = async (
+  req: Request,
+  res: Response<BaseResponse<Orders[]>>,
+  next: NextFunction
+) => {
   try {
     const { id } = req.body
     const rfid = req.params.rfid
-    const connectedSockets = tcpService.getConnectedSockets();
+    const connectedSockets = tcpService.getConnectedSockets()
 
     const findMachine = await prisma.machines.findUnique({
       where: { id }
     })
 
     if (findMachine && connectedSockets.length > 0) {
-      connectedSockets.filter((item) => {
+      connectedSockets.filter(item => {
         if (item.remoteAddress !== findMachine.IP) {
           throw new HttpError(500, 'เครื่องไม่พร้อมใช้งาน')
         }
@@ -33,11 +51,22 @@ export const dispenseOrder = async (req: Request, res: Response<BaseResponse<Ord
     } else {
       const response = await getPharmacyPres(rfid)
       const value = await createPresService(response)
-      const cmd: PlcSendMessage[] = value.map((item) => { return { floor: item.Floor, position: item.Position, id: id, orderId: item.id, qty: item.OrderQty, presId: item.PrescriptionId } })
+      const cmd: PlcSendMessage[] = value.map(item => {
+        return {
+          floor: item.Floor,
+          position: item.Position,
+          id: id,
+          orderId: item.id,
+          qty: item.OrderQty,
+          presId: item.PrescriptionId
+        }
+      })
       await sendOrder(cmd, 'orders')
-      await statusPrescription(response.PrescriptionNo, "pending")
+      await statusPrescription(response.PrescriptionNo, 'pending')
       // io.sockets.emit("res_message", `Create : ${response.PrescriptionNo}`)
-      socketService.getIO().emit("res_message", `Create : ${response.PrescriptionNo}`)
+      socketService
+        .getIO()
+        .emit('res_message', `Create : ${response.PrescriptionNo}`)
       res.status(200).json({
         message: 'Success',
         success: true,
@@ -49,8 +78,11 @@ export const dispenseOrder = async (req: Request, res: Response<BaseResponse<Ord
   }
 }
 
-
-export const getOrder = async (req: Request, res: Response<BaseResponse<Orders[]>>, next: NextFunction) => {
+export const getOrder = async (
+  req: Request,
+  res: Response<BaseResponse<Orders[]>>,
+  next: NextFunction
+) => {
   try {
     // const token = req.headers['authorization']
     res.status(200).json({
@@ -63,7 +95,11 @@ export const getOrder = async (req: Request, res: Response<BaseResponse<Orders[]
   }
 }
 
-export const receiveOrder = async (req: Request, res: Response<BaseResponse<Orders>>, next: NextFunction) => {
+export const receiveOrder = async (
+  req: Request,
+  res: Response<BaseResponse<Orders>>,
+  next: NextFunction
+) => {
   try {
     const { sticker } = req.params
     // const presId = sticker.split("|")[0]
@@ -95,8 +131,11 @@ export const receiveOrder = async (req: Request, res: Response<BaseResponse<Orde
 //   }
 // };
 
-
-export const updateStatusPending = async (req: Request, res: Response<BaseResponse<Orders>>, next: NextFunction) => {
+export const updateStatusPending = async (
+  req: Request,
+  res: Response<BaseResponse<Orders>>,
+  next: NextFunction
+) => {
   try {
     const { id, presId } = req.params
     res.status(200).json({
@@ -109,7 +148,11 @@ export const updateStatusPending = async (req: Request, res: Response<BaseRespon
   }
 }
 
-export const updateStatusReceive = async (req: Request, res: Response<BaseResponse<Orders>>, next: NextFunction) => {
+export const updateStatusReceive = async (
+  req: Request,
+  res: Response<BaseResponse<Orders>>,
+  next: NextFunction
+) => {
   try {
     const { id, presId } = req.params
     res.status(200).json({
@@ -122,7 +165,11 @@ export const updateStatusReceive = async (req: Request, res: Response<BaseRespon
   }
 }
 
-export const updateStatusComplete = async (req: Request, res: Response<BaseResponse<Orders>>, next: NextFunction) => {
+export const updateStatusComplete = async (
+  req: Request,
+  res: Response<BaseResponse<Orders>>,
+  next: NextFunction
+) => {
   try {
     const { id, presId } = req.params
     res.status(200).json({
@@ -135,7 +182,11 @@ export const updateStatusComplete = async (req: Request, res: Response<BaseRespo
   }
 }
 
-export const updateStatusRrror = async (req: Request, res: Response<BaseResponse<Orders>>, next: NextFunction) => {
+export const updateStatusRrror = async (
+  req: Request,
+  res: Response<BaseResponse<Orders>>,
+  next: NextFunction
+) => {
   try {
     const { id, presId } = req.params
     res.status(200).json({
@@ -148,7 +199,11 @@ export const updateStatusRrror = async (req: Request, res: Response<BaseResponse
   }
 }
 
-export const updateStatusReady = async (req: Request, res: Response<BaseResponse<Orders>>, next: NextFunction) => {
+export const updateStatusReady = async (
+  req: Request,
+  res: Response<BaseResponse<Orders>>,
+  next: NextFunction
+) => {
   try {
     const { id, presId } = req.params
     res.status(200).json({
@@ -161,19 +216,23 @@ export const updateStatusReady = async (req: Request, res: Response<BaseResponse
   }
 }
 
-export const cancelOrder = async (req: Request, res: Response<BaseResponse<string>>, next: NextFunction) => {
+export const cancelOrder = async (
+  req: Request,
+  res: Response<BaseResponse<string>>,
+  next: NextFunction
+) => {
   try {
     const { prescriptionId } = req.params
     await deletePrescription(prescriptionId)
     await cancelQueue('orders')
-    io.sockets.emit("res_message", `Delete Order Success!!`)
+    io.sockets.emit('res_message', `Delete Order Success!!`)
     res.status(200).json({
       message: 'Success',
       success: true,
       data: 'Delete Order Success'
     })
   } catch (error) {
-    throw (error)
+    throw error
   }
 }
 
@@ -183,14 +242,17 @@ export const updateOrderList = async (req: Request, res: Response) => {
   try {
     const response = await updateOrder(order_id, order_status)
     if (response?.OrderStatus === '1') {
-      io.sockets.emit("res_message", `Dispensing : ${order_id}`)
+      io.sockets.emit('res_message', `Dispensing : ${order_id}`)
     } else if (response?.OrderStatus === '2' || response?.OrderStatus === '3') {
       const order: Orders[] = await findOrders(['0', '1'])
       if (order.length === 0) {
-        io.sockets.emit("res_message", `Complete & Done : ${response.PrescriptionId}`)
+        io.sockets.emit(
+          'res_message',
+          `Complete & Done : ${response.PrescriptionId}`
+        )
         await updatePrescription(response.PrescriptionId, '2')
       } else {
-        io.sockets.emit("res_message", `Complete : ${order_id}`)
+        io.sockets.emit('res_message', `Complete : ${order_id}`)
         await updatePrescription(response.PrescriptionId, '3')
       }
     }

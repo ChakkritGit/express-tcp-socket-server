@@ -17,7 +17,7 @@ const app = express()
 const server: http.Server = createServer(app)
 const port = process.env.PORT || 3000
 const tcpPort = 2004
-const rabbitService = RabbitMQService.getInstance();
+const rabbitService = RabbitMQService.getInstance()
 
 app.use(cors({ origin: '*' }))
 app.use(express.json())
@@ -43,13 +43,12 @@ server.listen(port, async () => {
     console.error('Error initializing TCP Server:', error)
   }
 
-    try {
+  try {
     await initRabbitMq()
     console.log('✅ RabbitMQ initialized')
   } catch (error) {
     console.error('Error rabbitMQ initialize: ', error)
   }
-
 
   try {
     rabbitService.listenToQueue('orders')
