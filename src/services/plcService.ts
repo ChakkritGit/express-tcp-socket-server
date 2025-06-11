@@ -1,4 +1,7 @@
 export class PlcService {
+  sendCommand(arg0: string) {
+    throw new Error("Method not implemented.");
+  }
   sendToPLC(message: string) {
     throw new Error('Method not implemented.');
   }
