@@ -424,47 +424,83 @@ export const updateStatusOrderServicePending = async (
       include: { Order: true }
     })
 
+    const checkMachineStatus = (
+      cmd: string
+    ): Promise<{ status: string; raw: string }> => {
+      return new Promise(resolve => {
+        const running = plcService.getRunning()
+        const m = parseInt(cmd.slice(1))
+        const sumValue = 0 + 0 + 0 + 0 + 0 + m + 0 + running + 4500
+        const sum = pad(sumValue, 2).slice(-2)
+        const checkMsg = `B00R00C00Q0000L00${cmd}T00N${running}D4500S${sum}`
+
+        console.log(`📤 Sending status check command: ${checkMsg}`)
+        socket.write(checkMsg)
+
+        // const timeout = setTimeout(() => {
+        //   socket.off('data', onData);
+        //   reject(new Error('Timeout: PLC ไม่ตอบสนอง'));
+        // }, 5000);
+
+        const onData = (data: Buffer) => {
+          const message = data.toString()
+          const status = message.split('T')[1]?.substring(0, 2) ?? '00'
+          // clearTimeout(timeout);
+          socket.off('data', onData)
+          console.log(
+            `📥 Response from PLC (${cmd}):`,
+            message,
+            '| Status T:',
+            status
+          )
+          resolve({ status, raw: message })
+        }
+
+        socket.on('data', onData)
+      })
+    }
+
     if (socket && status === 'receive') {
-      const checkMachineStatus = (
-        cmd: string
-      ): Promise<{ status: string; raw: string }> => {
-        return new Promise(resolve => {
-          const running = plcService.getRunning()
-          const m = parseInt(cmd.slice(1))
-          const sumValue = 0 + 0 + 0 + 0 + 0 + m + 0 + running + 4500
-          const sum = pad(sumValue, 2).slice(-2)
-          const checkMsg = `B00R00C00Q0000L00${cmd}T00N${running}D4500S${sum}`
-
-          console.log(`📤 Sending status check command: ${checkMsg}`)
-          socket.write(checkMsg)
-
-          // const timeout = setTimeout(() => {
-          //   socket.off('data', onData);
-          //   reject(new Error('Timeout: PLC ไม่ตอบสนอง'));
-          // }, 5000);
-
-          const onData = (data: Buffer) => {
-            const message = data.toString()
-            const status = message.split('T')[1]?.substring(0, 2) ?? '00'
-            // clearTimeout(timeout);
-            socket.off('data', onData)
-            console.log(
-              `📥 Response from PLC (${cmd}):`,
-              message,
-              '| Status T:',
-              status
-            )
-            resolve({ status, raw: message })
-          }
-
-          socket.on('data', onData)
-        })
-      }
-
       const status = await checkMachineStatus('M39')
 
       if (status.status !== '37') {
         rabbitService.acknowledgeMessage()
+      } else {
+        const startTime = Date.now()
+        const timeout = 3 * 60 * 1000 // 3 นาที
+        let round = 1
+
+        while (true) {
+          const status = await checkMachineStatus('M38') // เช็คประตู
+          console.log(`status: ${round}`, status.status)
+
+          if (status.status === '30') {
+            // ประตูปิดแล้ว
+            rabbitService.acknowledgeMessage()
+            socketService
+              .getIO()
+              .emit('res_message', `Receive Order : ${result?.id}`)
+            round + 1
+            break
+          }
+
+          const elapsed = Date.now() - startTime
+          if (elapsed > timeout) {
+            // ครบเวลา 3 นาที แต่ประตูยังไม่ปิด
+            console.error('Timeout: ประตูไม่ปิดภายใน 3 นาที')
+            rabbitService.acknowledgeMessage()
+            socketService
+              .getIO()
+              .emit(
+                'res_message',
+                `Timeout: ประตูไม่ปิดภายใน 3 นาที สำหรับ Order : ${result?.id}`
+              )
+            round + 1
+            break
+          }
+
+          await new Promise(resolve => setTimeout(resolve, 1000)) // รอ 1 วิ ก่อนเช็คใหม่
+        }
       }
     }
 
