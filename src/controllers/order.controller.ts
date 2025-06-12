@@ -60,7 +60,7 @@ export const dispenseOrder = async (
           qty: item.OrderQty,
           presId: item.PrescriptionId
         }
-      })
+      }).sort((a, b) => a.floor - b.floor)
       await sendOrder(cmd, 'orders')
       await statusPrescription(response.PrescriptionNo, 'pending')
       // io.sockets.emit("res_message", `Create : ${response.PrescriptionNo}`)

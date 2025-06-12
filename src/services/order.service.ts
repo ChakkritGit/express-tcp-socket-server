@@ -49,15 +49,9 @@ export const createPresService = async (
     const presList: PrescriptionList[] = pres.Prescription.filter(
       item => item.Machine === 'ADD'
     )
+
     if (presList.length > 0) {
       const order: Orders[] = presList.map(item => {
-        // let command = item.command
-
-        // const numberAtPosition = command.slice(4, 5)
-
-        // if (numberAtPosition >= '1' && numberAtPosition <= '9') {
-        //   command = command.slice(0, 4) + '0' + command.slice(4)
-        // }
 
         return {
           id: `ORD-${item.RowID}`,
@@ -69,13 +63,13 @@ export const createPresService = async (
           Machine: item.Machine,
           Command: item.command,
           OrderStatus: 'ready',
-          Floor: Number(item.f_binlocation.substring(0, 1)),
-          Position: Number(item.f_binlocation.substring(1)),
+          Floor: parseInt(item.f_binlocation.substring(0, 1)),
+          Position: parseInt(item.f_binlocation.substring(1)),
           Slot: null,
           CreatedAt: getDateFormat(new Date()),
           UpdatedAt: getDateFormat(new Date())
         }
-      })
+      }).sort((a, b) => a.Floor - b.Floor)
 
       const warnings: string[] = await Promise.all(
         order.map(async items => {
@@ -99,6 +93,7 @@ export const createPresService = async (
       )
 
       const filteredWarnings = warnings.filter(warning => warning !== null)
+
       await prisma.$transaction([
         prisma.prescription.create({
           data: {
@@ -381,50 +376,6 @@ export const updateStatusOrderServicePending = async (
     const connectedSockets = tcpService.getConnectedSockets()
     const socket = connectedSockets[0]
 
-    if (socket && status === 'receive') {
-      const checkMachineStatus = (
-        cmd: string
-      ): Promise<{ status: string; raw: string }> => {
-        return new Promise(resolve => {
-          const running = plcService.getRunning()
-          const m = parseInt(cmd.slice(1))
-          const sumValue = 0 + 0 + 0 + 0 + 0 + m + 0 + running + 4500
-          const sum = pad(sumValue, 2).slice(-2)
-          const checkMsg = `B00R00C00Q0000L00${cmd}T00N${running}D4500S${sum}`
-
-          console.log(`📤 Sending status check command: ${checkMsg}`)
-          socket.write(checkMsg)
-
-          // const timeout = setTimeout(() => {
-          //   socket.off('data', onData);
-          //   reject(new Error('Timeout: PLC ไม่ตอบสนอง'));
-          // }, 5000);
-
-          const onData = (data: Buffer) => {
-            const message = data.toString()
-            const status = message.split('T')[1]?.substring(0, 2) ?? '00'
-            // clearTimeout(timeout);
-            socket.off('data', onData)
-            console.log(
-              `📥 Response from PLC (${cmd}):`,
-              message,
-              '| Status T:',
-              status
-            )
-            resolve({ status, raw: message })
-          }
-
-          socket.on('data', onData)
-        })
-      }
-
-      const status = await checkMachineStatus('M39')
-
-      if (status.status !== '37') {
-        rabbitService.acknowledgeMessage()
-      }
-    }
-
     const order = await prisma.orders.findUnique({
       where: { id: id, PrescriptionId: presId }
     })
@@ -475,6 +426,50 @@ export const updateStatusOrderServicePending = async (
       },
       include: { Order: true }
     })
+
+    if (socket && status === 'receive') {
+      const checkMachineStatus = (
+        cmd: string
+      ): Promise<{ status: string; raw: string }> => {
+        return new Promise(resolve => {
+          const running = plcService.getRunning()
+          const m = parseInt(cmd.slice(1))
+          const sumValue = 0 + 0 + 0 + 0 + 0 + m + 0 + running + 4500
+          const sum = pad(sumValue, 2).slice(-2)
+          const checkMsg = `B00R00C00Q0000L00${cmd}T00N${running}D4500S${sum}`
+
+          console.log(`📤 Sending status check command: ${checkMsg}`)
+          socket.write(checkMsg)
+
+          // const timeout = setTimeout(() => {
+          //   socket.off('data', onData);
+          //   reject(new Error('Timeout: PLC ไม่ตอบสนอง'));
+          // }, 5000);
+
+          const onData = (data: Buffer) => {
+            const message = data.toString()
+            const status = message.split('T')[1]?.substring(0, 2) ?? '00'
+            // clearTimeout(timeout);
+            socket.off('data', onData)
+            console.log(
+              `📥 Response from PLC (${cmd}):`,
+              message,
+              '| Status T:',
+              status
+            )
+            resolve({ status, raw: message })
+          }
+
+          socket.on('data', onData)
+        })
+      }
+
+      const status = await checkMachineStatus('M39')
+
+      if (status.status !== '37') {
+        rabbitService.acknowledgeMessage()
+      }
+    }
 
     return result as unknown as Orders
   } catch (error) {
