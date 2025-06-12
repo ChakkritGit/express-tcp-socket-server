@@ -16,18 +16,8 @@ import RabbitMQService from './RabbitMQService'
 import { PlcService } from './plcService'
 import { pad } from '../utils/helpers'
 
-const validStatusTransitions = {
-  ready: 'pending',
-  pending: 'ready',
-  receive: 'pending',
-  complete: 'receive',
-  error: 'pending'
-}
-
 const plcService = new PlcService()
 const rabbitService = RabbitMQService.getInstance()
-
-type OrderStatus = keyof typeof validStatusTransitions
 
 export const findPrescription = async () => {
   try {
@@ -51,25 +41,26 @@ export const createPresService = async (
     )
 
     if (presList.length > 0) {
-      const order: Orders[] = presList.map(item => {
-
-        return {
-          id: `ORD-${item.RowID}`,
-          PrescriptionId: item.f_prescriptionno,
-          OrderItemId: item.f_orderitemcode,
-          OrderItemName: item.f_orderitemname,
-          OrderQty: item.f_orderqty,
-          OrderUnitcode: item.f_orderunitcode,
-          Machine: item.Machine,
-          Command: item.command,
-          OrderStatus: 'ready',
-          Floor: parseInt(item.f_binlocation.substring(0, 1)),
-          Position: parseInt(item.f_binlocation.substring(1)),
-          Slot: null,
-          CreatedAt: getDateFormat(new Date()),
-          UpdatedAt: getDateFormat(new Date())
-        }
-      }).sort((a, b) => a.Floor - b.Floor)
+      const order: Orders[] = presList
+        .map(item => {
+          return {
+            id: `ORD-${item.RowID}`,
+            PrescriptionId: item.f_prescriptionno,
+            OrderItemId: item.f_orderitemcode,
+            OrderItemName: item.f_orderitemname,
+            OrderQty: item.f_orderqty,
+            OrderUnitcode: item.f_orderunitcode,
+            Machine: item.Machine,
+            Command: item.command,
+            OrderStatus: 'ready',
+            Floor: parseInt(item.f_binlocation.substring(0, 1)),
+            Position: parseInt(item.f_binlocation.substring(1)),
+            Slot: null,
+            CreatedAt: getDateFormat(new Date()),
+            UpdatedAt: getDateFormat(new Date())
+          }
+        })
+        .sort((a, b) => a.Floor - b.Floor)
 
       const warnings: string[] = await Promise.all(
         order.map(async items => {
@@ -369,7 +360,7 @@ export const received = async (drugId: string): Promise<Orders> => {
 
 export const updateStatusOrderServicePending = async (
   id: string,
-  status: OrderStatus,
+  status: string,
   presId: string
 ) => {
   try {
@@ -382,8 +373,16 @@ export const updateStatusOrderServicePending = async (
 
     if (!order) throw new HttpError(404, 'ไม่พบรายการ!')
 
+    const validStatusTransitions: { [key: string]: string } = {
+      pending: 'ready',
+      receive: 'pending',
+      complete: 'receive',
+      error: 'pending',
+      ready: 'pending'
+    }
+
     if (order.OrderStatus !== validStatusTransitions[status]) {
-      if (order.OrderStatus === 'pending') {
+      if (status === 'error' && order.OrderStatus === 'pending') {
         throw new HttpError(
           400,
           'รายการอยู่ระหว่างดำเนินการและยังไม่ได้อยู่ในสถานะรับ!'
