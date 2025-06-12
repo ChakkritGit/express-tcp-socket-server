@@ -425,8 +425,8 @@ export const sendCommandFromQueue = (
         position: position,
         plcResponse: data.toString()
       })
-      return resolve(true)
     })
+    return resolve(true)
   })
 }
 

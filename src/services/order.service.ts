@@ -292,15 +292,9 @@ export const received = async (drugId: string): Promise<Orders> => {
           console.log(`📤 Sending status check command: ${checkMsg}`)
           socket.write(checkMsg)
 
-          // const timeout = setTimeout(() => {
-          //   socket.off('data', onData);
-          //   reject(new Error('Timeout: PLC ไม่ตอบสนอง'));
-          // }, 5000);
-
           const onData = (data: Buffer) => {
             const message = data.toString()
             const status = message.split('T')[1]?.substring(0, 2) ?? '00'
-            // clearTimeout(timeout);
             socket.off('data', onData)
             console.log(
               `📥 Response from PLC (${cmd}):`,
@@ -318,16 +312,19 @@ export const received = async (drugId: string): Promise<Orders> => {
       if (socket) {
         const startTime = Date.now()
         const timeout = 3 * 60 * 1000 // 3 นาที
+        let round = 1
 
         while (true) {
-          const status = await checkMachineStatus('M39') // เช็คประตู
+          const status = await checkMachineStatus('M38') // เช็คประตู
+          console.log(`status: ${round}`, status.status)
 
-          if (status.status === '') {
+          if (status.status === '30') {
             // ประตูปิดแล้ว
             rabbitService.acknowledgeMessage()
             socketService
               .getIO()
               .emit('res_message', `Receive Order : ${result.id}`)
+            round + 1
             break
           }
 
@@ -342,6 +339,7 @@ export const received = async (drugId: string): Promise<Orders> => {
                 'res_message',
                 `Timeout: ประตูไม่ปิดภายใน 3 นาที สำหรับ Order : ${result.id}`
               )
+            round + 1
             break
           }
 
