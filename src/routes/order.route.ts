@@ -18,7 +18,7 @@ const orderRouter: Router = Router()
 
 orderRouter.get('/', getOrder)
 orderRouter.get('/dispense/:rfid', dispenseOrder)
-orderRouter.get('/receive/:sticker', receiveOrder)
+// orderRouter.get('/receive/:sticker', receiveOrder)
 orderRouter.get('/status/pending/:id/:presId', updateStatusPending)
 orderRouter.get('/status/receive/:id/:presId', updateStatusReceive)
 orderRouter.get('/status/complete/:id/:presId', updateStatusComplete)
